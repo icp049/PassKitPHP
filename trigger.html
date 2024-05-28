@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generated Codabar Barcode</title>
+</head>
+<body>
+    <h1>Generated Codabar Barcode</h1>
+    
+    <h2>Barcode Image:</h2>
+    <img id="barcodeImage" src="<?php echo $barcodeImageSrc; ?>" alt="Codabar Barcode">
+    <p id="barcodeCharacters"><?php echo $codabarData; ?></p>
+    <p>Barcode image saved as strip.png successfully.</p>
+
+    <button onclick="generateNewBarcode()">Generate New Barcode</button>
+
+    <script>
+        function generateNewBarcode() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', 'generate.php', true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    var response = JSON.parse(xhr.responseText);
+                    document.getElementById('barcodeImage').src = response.barcodeImageSrc;
+                    document.getElementById('barcodeCharacters').innerText = response.codabarData;
+                }
+            };
+            xhr.send();
+        }
+    </script>
+</body>
+</html>
