@@ -1,0 +1,106 @@
+<?php
+require 'vendor/autoload.php';
+
+use GuzzleHttp\Client;
+use Firebase\JWT\JWT;
+
+class WalletPass {
+    private $credentials;
+    private $client;
+    private $baseUrl = 'https://walletobjects.googleapis.com/walletobjects/v1';
+    private $issuerId = '';
+    private $classId;
+
+    public function __construct($credentialsPath) {
+        $this->credentials = json_decode(file_get_contents($credentialsPath), true);
+        $this->client = new Client();
+        $this->classId = $this->issuerId . '.codelab_class';
+    }
+
+    private function getAuthToken() {
+        $tokenUri = 'https://oauth2.googleapis.com/token';
+
+        $jwt = JWT::encode([
+            'iss' => $this->credentials['client_email'],
+            'scope' => 'https://www.googleapis.com/auth/wallet_object.issuer',
+            'aud' => $tokenUri,
+            'exp' => time() + 3600,
+            'iat' => time()
+        ], $this->credentials['private_key'], 'RS256');
+
+        $response = $this->client->post($tokenUri, [
+            'form_params' => [
+                'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                'assertion' => $jwt
+            ]
+        ]);
+
+        $data = json_decode($response->getBody(), true);
+        return $data['access_token'];
+    }
+
+    private function formatCodabar($accountNumber) {
+        return 'A' . $accountNumber . 'A';
+    }
+
+    public function createPassObject() {
+        $objectId = "{$this->issuerId}.default_object_id"; 
+
+        $accountNumber = "29085006805780";  // Hardcoded account number
+        $codabar = $this->formatCodabar($accountNumber);
+        $firstName = "Ian";
+        $lastName = "Pedeglorio";
+
+        $genericObject = [
+            'id' => $objectId,
+            'classId' => $this->classId,
+            'genericType' => 'GENERIC_TYPE_UNSPECIFIED',
+            'hexBackgroundColor' => '#4285f4',
+            'logo' => [
+                'sourceUri' => [
+                    'uri' => 'https://rplstatic.s3.us-west-2.amazonaws.com/reginalibrary.ca/RPL_Logo.png'
+                ]
+            ],
+            'cardTitle' => [
+                'defaultValue' => [
+                    'language' => 'en',
+                    'value' => 'Regina Public Library'
+                ]
+            ],
+            'header' => [
+                'defaultValue' => [
+                    'language' => 'en',
+                    'value' => $firstName . ' ' . $lastName
+                ]
+            ],
+            'barcode' => [
+                'type' => 'CODABAR',
+                'value' => $codabar
+            ]
+        ];
+
+        $claims = [
+            'iss' => $this->credentials['client_email'],
+            'aud' => 'google',
+            'origins' => [],
+            'typ' => 'savetowallet',
+            'payload' => [
+                'genericObjects' => [$genericObject]
+            ]
+        ];
+
+        $token = JWT::encode($claims, $this->credentials['private_key'], 'RS256');
+        $saveUrl = "https://pay.google.com/gp/v/save/{$token}";
+
+        return $saveUrl;
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $walletPass = new WalletPass('config/walletconfig.json');
+
+    echo $walletPass->createPassObject();
+
+    
+}
+?>
